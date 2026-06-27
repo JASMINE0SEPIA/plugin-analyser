@@ -19,8 +19,11 @@ void printUsage(const char* programName) {
 }
 
 int main(int argc, char* argv[]) {
+    juce::initialiseJuce_GUI();
+
     if (argc < 3) {
         printUsage(argv[0]);
+        juce::shutdownJuce_GUI();
         return 1;
     }
 
@@ -159,8 +162,10 @@ int main(int argc, char* argv[]) {
         plugin->releaseResources();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
+        juce::shutdownJuce_GUI();
         return 1;
     }
 
+    juce::shutdownJuce_GUI();
     return 0;
 }

@@ -1,0 +1,10 @@
+^C:\USERS\XINGO\DEVELOPMENT\AUDIO\SEPIA_KNOWLEDGE_BASE\REPOSITORIES\PLUGIN-ANALYSER\BUILD-VS\_DEPS\JUCE-SRC\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/xingo/Development/audio/sepia_knowledge_base/repositories/plugin-analyser/build-vs/_deps/juce-src -BC:/Users/xingo/Development/audio/sepia_knowledge_base/repositories/plugin-analyser/build-vs/_deps/juce-build/tools --check-stamp-file C:/Users/xingo/Development/audio/sepia_knowledge_base/repositories/plugin-analyser/build-vs/_deps/juce-build/tools/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

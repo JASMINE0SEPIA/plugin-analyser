@@ -1,0 +1,156 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MainWindow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MainComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\ParameterConfigComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MeasurementConfigComponent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\Config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\PluginLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\SignalGenerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\BucketSpec.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\RawCsvAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\RmsPeakAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\TransferCurveAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\LinearResponseAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\ThdAnalyzer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MeasurementEngine.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_ara.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_audio_processors\juce_audio_processors_lv2_libs.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_gui_extra\juce_gui_extra.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_gui_basics\juce_gui_basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_graphics\juce_graphics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_graphics\juce_graphics_Harfbuzz.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_events\juce_events.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_core\juce_core.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_core\juce_core_CompilationTime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_data_structures\juce_data_structures.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_audio_basics\juce_audio_basics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_dsp\juce_dsp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\_deps\juce-src\modules\juce_audio_formats\juce_audio_formats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MainWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MainComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\ParameterConfigComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MeasurementConfigComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\Config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\PluginLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\SignalGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\BucketSpec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\RunConfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\BlockContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\Analyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\RawCsvAnalyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\RmsPeakAnalyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\TransferCurveAnalyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\LinearResponseAnalyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\ThdAnalyzer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\src\MeasurementEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{EFACE755-F286-3242-B371-8C5FBE5B017B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{525FA151-A914-3553-948A-49427BFE607A}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\xingo\Development\audio\sepia_knowledge_base\repositories\plugin-analyser\build-vs\CMakeFiles\8132c3ad71884b18ccaaa45a7e7d64a1\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{203A0E1F-0090-3CCA-B0F9-2793373A5C27}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -70,7 +70,7 @@ set(SOURCES
 )
 
 # Create GUI application
-add_executable(PluginAnalyser MACOSX_BUNDLE ${SOURCES})
+add_executable(PluginAnalyser WIN32 MACOSX_BUNDLE ${SOURCES})
 
 target_compile_definitions(PluginAnalyser
     PRIVATE
