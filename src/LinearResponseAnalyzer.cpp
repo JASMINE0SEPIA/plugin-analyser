@@ -38,8 +38,9 @@ void LinearResponseAnalyzer::processFFTWindow(RunSpectrum& spectrum) {
         outFFT[i] = std::complex<float>(spectrum.outBuffer[i], 0.0f);
     }
 
-    // Perform FFT
-    fft.perform(inFFT.data(), outFFT.data(), false);
+    // Perform in-place forward FFT on both input and output
+    fft.perform(inFFT.data(), inFFT.data(), false);
+    fft.perform(outFFT.data(), outFFT.data(), false);
 
     // Accumulate magnitude squared
     const int numBins = fftSize / 2;
