@@ -500,11 +500,7 @@ void MainComponent::runMeasurement() {
                                       juce::dontSendNotification);
             });
 
-            // Pass progress callback to update UI with time estimate
             auto startTime = std::chrono::steady_clock::now();
-            int numThreads = (int)std::thread::hardware_concurrency();
-            if (numThreads == 0)
-                numThreads = 1; // Fallback if detection fails
             runMeasurementGrid(
                 *measurementPlugin, config.sampleRate, config.blockSize, totalSamples, runs, analyzers, config, outDir,
                 [this, runs, startTime](int runIndex) {
@@ -514,7 +510,6 @@ void MainComponent::runMeasurement() {
 
                     juce::String statusText = "Run " + juce::String(runIndex + 1) + " / " + juce::String(runs.size());
 
-                    // Estimate remaining time
                     if (runIndex > 0 && elapsed > 0) {
                         double runsPerSecond = (double)(runIndex + 1) / (double)elapsed;
                         int remainingRuns = runs.size() - (runIndex + 1);
@@ -538,8 +533,7 @@ void MainComponent::runMeasurement() {
                         this->progress = progress;
                         progressBar.repaint();
                     });
-                },
-                numThreads);
+                });
             std::cerr << "[Measurement] Measurement grid complete" << std::endl;
 
             // Finish analyzers

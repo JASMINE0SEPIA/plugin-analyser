@@ -3,7 +3,6 @@
 #include "MeasurementEngine.h"
 #include "PluginLoader.h"
 #include <iostream>
-#include <thread>
 #include <vector>
 
 void printUsage(const char* programName) {
@@ -15,10 +14,8 @@ void printUsage(const char* programName) {
     std::cout << "  --seconds N         Override duration in seconds\n";
     std::cout << "  --samplerate SR     Override sample rate\n";
     std::cout << "  --blocksize BS      Override block size\n";
-    std::cout << "  --threads N         Override number of threads (default: auto-detect)\n";
 }
 
-// Apply CLI overrides to a config
 static void applyOverrides(Config& config, const juce::String& pluginPathOverride, double secondsOverride,
                            double sampleRateOverride, int blockSizeOverride) {
     if (!pluginPathOverride.isEmpty())
@@ -31,11 +28,8 @@ static void applyOverrides(Config& config, const juce::String& pluginPathOverrid
         config.blockSize = blockSizeOverride;
 }
 
-// Run a single config using pre-loaded plugin instances
 static void runSingleConfig(const Config& config, const juce::File& baseOutDir,
-                            std::vector<std::unique_ptr<juce::AudioPluginInstance>>& pluginInstances,
-                            std::vector<std::map<juce::String, juce::AudioProcessorParameter*>>& paramMaps) {
-    // Determine output directory
+                            juce::AudioPluginInstance& plugin) {
     juce::File outDir = baseOutDir;
     if (!config.outSubDir.isEmpty()) {
         outDir = baseOutDir.getChildFile(config.outSubDir);
@@ -51,30 +45,27 @@ static void runSingleConfig(const Config& config, const juce::File& baseOutDir,
     std::cout << "\n=== Running config: signalType=" << config.signalType
               << ", outDir=" << outDir.getFullPathName() << " ===" << std::endl;
 
-    // Build parameter name list
     std::vector<juce::String> paramNames = getAllParamNames(config);
 
-    // Build run grid
     std::cout << "Building measurement grid..." << std::endl;
     auto runs = buildRunGrid(config, paramNames);
     std::cout << "Generated " << runs.size() << " measurement runs" << std::endl;
 
-    // Create analyzers
     std::cout << "Creating analyzers..." << std::endl;
     auto analyzers = createAnalyzers(config, outDir, paramNames);
     std::cout << "Created " << analyzers.size() << " analyzers" << std::endl;
 
-    // Run measurements
     int64_t totalSamples = (int64_t)(config.seconds * config.sampleRate);
 
-    runMeasurementGridWithLoadedInstances(pluginInstances, paramMaps, config.sampleRate, config.blockSize,
-                                          totalSamples, runs, analyzers, config, outDir, nullptr);
+    runMeasurementGrid(plugin, config.sampleRate, config.blockSize, totalSamples, runs, analyzers, config, outDir,
+                       nullptr);
 
-    // Finish analyzers (called here, not in runMeasurementGrid)
     std::cout << "Finalizing analyzers..." << std::endl;
     for (auto& analyzer : analyzers) {
         analyzer->finish(outDir);
     }
+
+    resetAllParametersToDefault(plugin);
 
     std::cout << "Config complete: " << config.signalType << std::endl;
 }
@@ -94,9 +85,7 @@ int main(int argc, char* argv[]) {
     double secondsOverride = -1.0;
     double sampleRateOverride = -1.0;
     int blockSizeOverride = -1;
-    int threadsOverride = -1;
 
-    // Parse command line arguments
     for (int i = 1; i < argc; ++i) {
         juce::String arg = argv[i];
 
@@ -112,8 +101,6 @@ int main(int argc, char* argv[]) {
             sampleRateOverride = juce::String(argv[++i]).getDoubleValue();
         } else if (arg == "--blocksize" && i + 1 < argc) {
             blockSizeOverride = juce::String(argv[++i]).getIntValue();
-        } else if (arg == "--threads" && i + 1 < argc) {
-            threadsOverride = juce::String(argv[++i]).getIntValue();
         }
     }
 
@@ -124,7 +111,6 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // Parse configs (single or batch)
         juce::File configFile(configPath);
         auto configs = Config::parseConfigs(configFile);
 
@@ -133,12 +119,10 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        // Apply overrides to all configs
         for (auto& config : configs) {
             applyOverrides(config, pluginPathOverride, secondsOverride, sampleRateOverride, blockSizeOverride);
         }
 
-        // Create base output directory
         juce::File baseOutDir(outPath);
         if (!baseOutDir.exists()) {
             baseOutDir.createDirectory();
@@ -148,36 +132,21 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        // Determine number of threads
-        int numThreads;
-        if (threadsOverride > 0) {
-            numThreads = threadsOverride;
-            std::cout << "Using " << numThreads << " thread(s) (override)" << std::endl;
-        } else {
-            numThreads = (int)std::thread::hardware_concurrency();
-            if (numThreads == 0)
-                numThreads = 1;
-            std::cout << "Running measurements with " << numThreads << " thread(s) (auto-detected)" << std::endl;
-        }
-
-        // Load plugin instances once for reuse across all configs
         std::cout << "Loading plugin: " << configs[0].pluginPath << std::endl;
         double sampleRate = configs[0].sampleRate;
         int blockSize = configs[0].blockSize;
         juce::String errorMessage;
-        auto firstPlugin =
-            loadPluginInstance(juce::File(configs[0].pluginPath), sampleRate, blockSize, errorMessage);
+        auto plugin = loadPluginInstance(juce::File(configs[0].pluginPath), sampleRate, blockSize, errorMessage);
 
-        if (firstPlugin == nullptr) {
+        if (plugin == nullptr) {
             std::cerr << (errorMessage.isEmpty() ? "Failed to load plugin" : errorMessage.toStdString())
                       << std::endl;
             return 1;
         }
 
-        std::cout << "Plugin loaded: " << firstPlugin->getName() << std::endl;
+        std::cout << "Plugin loaded: " << plugin->getName() << std::endl;
 
-        // List all available parameters from first instance
-        auto paramMap = buildParameterMap(*firstPlugin, true);
+        auto paramMap = buildParameterMap(*plugin, true);
         std::cout << "\nAvailable parameters (" << paramMap.size() << "):" << std::endl;
         std::cout << "========================================" << std::endl;
         int idx = 0;
@@ -194,35 +163,12 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "========================================\n" << std::endl;
 
-        // Pre-load all plugin instances
-        std::vector<std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
-        std::vector<std::map<juce::String, juce::AudioProcessorParameter*>> paramMaps;
-
-        pluginInstances.push_back(std::move(firstPlugin));
-        paramMaps.push_back(buildParameterMap(*pluginInstances[0], false));
-
-        for (int i = 1; i < numThreads; ++i) {
-            std::cerr << "Loading plugin instance " << (i + 1) << " / " << numThreads << "..." << std::endl;
-            auto plugin = loadPluginInstance(juce::File(configs[0].pluginPath), sampleRate, blockSize, errorMessage);
-            if (!plugin) {
-                std::cerr << "Failed to load plugin instance " << i << ": " << errorMessage << std::endl;
-                return 1;
-            }
-            paramMaps.push_back(buildParameterMap(*plugin, false));
-            pluginInstances.push_back(std::move(plugin));
-        }
-        std::cout << "All " << numThreads << " plugin instance(s) loaded" << std::endl;
-
-        // Run each config
         for (int ci = 0; ci < (int)configs.size(); ++ci) {
             std::cout << "\n>>> Config " << (ci + 1) << " / " << configs.size() << " <<<" << std::endl;
-            runSingleConfig(configs[ci], baseOutDir, pluginInstances, paramMaps);
+            runSingleConfig(configs[ci], baseOutDir, *plugin);
         }
 
-        // Release all plugin instances
-        for (auto& plugin : pluginInstances) {
-            plugin->releaseResources();
-        }
+        plugin->releaseResources();
 
         std::cout << "\nAll measurements complete!" << std::endl;
 

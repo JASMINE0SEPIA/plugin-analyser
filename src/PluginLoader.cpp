@@ -168,3 +168,11 @@ void setParameterValue(juce::AudioPluginInstance& plugin,
 
     it->second->setValueNotifyingHost(normalizedValue);
 }
+
+void resetAllParametersToDefault(juce::AudioPluginInstance& plugin) {
+    for (auto* param : plugin.getParameters()) {
+        if (param != nullptr) {
+            param->setValue(param->getDefaultValue());
+        }
+    }
+}

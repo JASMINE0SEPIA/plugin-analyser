@@ -10,13 +10,9 @@
 #include "TransferCurveAnalyzer.h"
 #include "TransientAnalyzer.h"
 #include <algorithm>
-#include <atomic>
 #include <cmath>
 #include <functional>
 #include <iostream>
-#include <mutex>
-#include <queue>
-#include <thread>
 
 std::vector<juce::String> getAllParamNames(const Config& config) {
     std::vector<juce::String> paramNames;
@@ -32,7 +28,6 @@ std::vector<RunConfig> buildRunGrid(const Config& config, const std::vector<juce
               << config.parameterBuckets.size() << " bucket configs" << std::endl;
     std::vector<RunConfig> runs;
 
-    // Convert ParameterBucketConfig to BucketSpec and generate values
     std::vector<std::pair<juce::String, std::vector<float>>> paramValueLists;
 
     for (const auto& bucketConfig : config.parameterBuckets) {
@@ -51,20 +46,16 @@ std::vector<RunConfig> buildRunGrid(const Config& config, const std::vector<juce
         paramValueLists.push_back({bucketConfig.paramName, values});
     }
 
-    // Build Cartesian product of parameter values and input gain buckets
     int runId = 0;
     std::cerr << "[buildRunGrid] Building Cartesian product with " << config.inputGainBucketsDb.size()
               << " input gain buckets..." << std::endl;
 
-    // Helper function to generate combinations recursively
     std::function<void(int, std::map<juce::String, float>)> generateCombinations;
     generateCombinations = [&](int paramIndex, std::map<juce::String, float> currentParams) {
         if (paramIndex >= (int)paramValueLists.size()) {
-            // All bucketed parameters set — now add fixed parameters
             for (const auto& [fixedName, fixedValue] : config.fixedParameterValues)
                 currentParams[fixedName] = fixedValue;
 
-            // Combine with input gain buckets
             for (float inputGainDb : config.inputGainBucketsDb) {
                 RunConfig run;
                 run.runId = runId++;
@@ -78,7 +69,6 @@ std::vector<RunConfig> buildRunGrid(const Config& config, const std::vector<juce
             return;
         }
 
-        // Try all values for current parameter
         const auto& [paramName, values] = paramValueLists[paramIndex];
         for (float value : values) {
             auto newParams = currentParams;
@@ -148,21 +138,16 @@ std::vector<std::unique_ptr<Analyzer>> createAnalyzers(const Config& config, con
     return analyzers;
 }
 
-// Worker function to process a single run
 static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
                        const std::map<juce::String, juce::AudioProcessorParameter*>& paramMap,
                        const std::vector<juce::String>& paramNames, const Config& config, double sampleRate,
-                       int blockSize, int64_t totalSamples, std::vector<std::unique_ptr<Analyzer>>& analyzers,
-                       std::mutex& analyzerMutex) {
-    // Set plugin parameters (both bucketed and fixed)
+                       int blockSize, int64_t totalSamples, std::vector<std::unique_ptr<Analyzer>>& analyzers) {
     for (const auto& [paramName, value] : run.paramValues) {
         setParameterValue(plugin, paramMap, paramName, value);
     }
 
-    // Convert input gain from dB to linear amplitude
     float inputGainLinear = std::pow(10.0f, run.inputGainDb / 20.0f);
 
-    // Create signal generator
     std::unique_ptr<SineGenerator> sineGen;
     std::unique_ptr<NoiseGenerator> noiseGen;
     std::unique_ptr<SweepGenerator> sweepGen;
@@ -202,7 +187,6 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         impulseGen->reset();
     }
 
-    // Process samples
     juce::AudioBuffer<float> inputBuffer(2, blockSize);
     juce::AudioBuffer<float> outputBuffer(2, blockSize);
     juce::MidiBuffer midiBuffer;
@@ -211,11 +195,9 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
     while (currentSample < totalSamples) {
         int numThisBlock = (int)std::min((int64_t)blockSize, totalSamples - currentSample);
 
-        // Clear buffers
         inputBuffer.clear();
         outputBuffer.clear();
 
-        // Fill input with test signal
         if (sineGen) {
             sineGen->fillBlock(inputBuffer, numThisBlock);
         } else if (noiseGen) {
@@ -228,13 +210,10 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
             impulseGen->fillBlock(inputBuffer, numThisBlock);
         }
 
-        // Copy input to output buffer (processBlock works in-place)
         outputBuffer.makeCopyOf(inputBuffer);
 
-        // Process through plugin (modifies outputBuffer in-place)
         plugin.processBlock(outputBuffer, midiBuffer);
 
-        // Build BlockContext
         BlockContext ctx;
         ctx.firstSample = currentSample;
         ctx.sampleRate = sampleRate;
@@ -247,7 +226,6 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         ctx.paramNamedValues = run.paramValues;
         ctx.inputGainDb = run.inputGainDb;
 
-        // Build params vector in fixed order
         for (const auto& paramName : paramNames) {
             float value = 0.0f;
             auto it = run.paramValues.find(paramName);
@@ -256,144 +234,28 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
             ctx.params.push_back(value);
         }
 
-        // Process through analyzers (with mutex protection)
-        {
-            std::lock_guard<std::mutex> lock(analyzerMutex);
-            for (auto& analyzer : analyzers) {
-                analyzer->processBlock(ctx);
-            }
+        for (auto& analyzer : analyzers) {
+            analyzer->processBlock(ctx);
         }
 
         currentSample += numThisBlock;
     }
 }
 
-void runMeasurementGridWithLoadedInstances(
-    std::vector<std::unique_ptr<juce::AudioPluginInstance>>& pluginInstances,
-    std::vector<std::map<juce::String, juce::AudioProcessorParameter*>>& paramMaps,
-    double sampleRate, int blockSize, int64_t totalSamples, const std::vector<RunConfig>& runs,
-    const std::vector<std::unique_ptr<Analyzer>>& analyzers, const Config& config, const juce::File& outDir,
-    std::function<void(int)> progressCallback) {
-    int numThreads = (int)pluginInstances.size();
-    std::cerr << "[runMeasurementGridWithLoadedInstances] Starting with " << runs.size() << " runs, "
-              << totalSamples << " samples per run, " << numThreads << " thread(s)" << std::endl;
-
-    std::queue<RunConfig> runQueue;
-    std::mutex queueMutex;
-    std::mutex analyzerMutex;
-    std::atomic<int> completedRuns{0};
-    std::atomic<int> currentRunIndex{0};
-
-    // Populate queue
-    for (const auto& run : runs) {
-        runQueue.push(run);
-    }
-
-    // Build param names for this config
-    std::vector<juce::String> paramNames = getAllParamNames(config);
-
-    // Worker function
-    auto worker = [&](int threadId) {
-        auto& threadPlugin = pluginInstances[threadId];
-        auto& paramMap = paramMaps[threadId];
-
-        while (true) {
-            RunConfig run;
-            {
-                std::lock_guard<std::mutex> lock(queueMutex);
-                if (runQueue.empty()) {
-                    break;
-                }
-                run = runQueue.front();
-                runQueue.pop();
-            }
-
-            int runIdx = currentRunIndex.fetch_add(1);
-            if (progressCallback) {
-                progressCallback(run.runId);
-            }
-            if (runIdx % 10 == 0 || runIdx == 0) {
-                std::cerr << "[runMeasurementGridWithLoadedInstances] Thread " << threadId
-                          << " processing run " << run.runId << " / " << runs.size() << std::endl;
-            }
-
-            processRun(run, *threadPlugin, paramMap, paramNames, config, sampleRate, blockSize, totalSamples,
-                       const_cast<std::vector<std::unique_ptr<Analyzer>>&>(analyzers), analyzerMutex);
-
-            completedRuns.fetch_add(1);
-        }
-    };
-
-    // Launch threads
-    std::vector<std::thread> threads;
-    for (int i = 0; i < numThreads; ++i) {
-        threads.emplace_back(worker, i);
-    }
-
-    // Wait for all threads
-    for (auto& thread : threads) {
-        thread.join();
-    }
-
-    std::cerr << "[runMeasurementGridWithLoadedInstances] All threads completed. Processed "
-              << completedRuns.load() << " runs" << std::endl;
-
-    // Note: finish() is called by the caller, not here
-}
-
 void runMeasurementGrid(juce::AudioPluginInstance& plugin, double sampleRate, int blockSize, int64_t totalSamples,
-                        const std::vector<RunConfig>& runs, const std::vector<std::unique_ptr<Analyzer>>& analyzers,
-                        const Config& config, const juce::File& outDir, std::function<void(int)> progressCallback,
-                        int numThreads) {
+                        const std::vector<RunConfig>& runs, std::vector<std::unique_ptr<Analyzer>>& analyzers,
+                        const Config& config, const juce::File& outDir,
+                        std::function<void(int)> progressCallback) {
     std::cerr << "[runMeasurementGrid] Starting with " << runs.size() << " runs, " << totalSamples
-              << " samples per run, " << numThreads << " thread(s)" << std::endl;
+              << " samples per run" << std::endl;
 
-    // Build parameter name list in order
     std::vector<juce::String> paramNames = getAllParamNames(config);
 
-    // If single-threaded, use original sequential code
-    if (numThreads <= 1) {
-        auto paramMap = buildParameterMap(plugin, false);
-        std::mutex dummyMutex;
-        for (const auto& run : runs) {
-            if (progressCallback) {
-                progressCallback(run.runId);
-            }
-            processRun(run, plugin, paramMap, paramNames, config, sampleRate, blockSize, totalSamples,
-                       const_cast<std::vector<std::unique_ptr<Analyzer>>&>(analyzers), dummyMutex);
+    auto paramMap = buildParameterMap(plugin, false);
+    for (const auto& run : runs) {
+        if (progressCallback) {
+            progressCallback(run.runId);
         }
-    } else {
-        // Multi-threaded execution
-        std::cerr << "[runMeasurementGrid] Pre-loading " << numThreads << " plugin instances..." << std::endl;
-        std::vector<std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
-        std::vector<std::map<juce::String, juce::AudioProcessorParameter*>> paramMaps;
-
-        for (int i = 0; i < numThreads; ++i) {
-            std::cerr << "[runMeasurementGrid] Loading plugin instance " << (i + 1) << " / " << numThreads
-                      << "..." << std::endl;
-            juce::String errorMessage;
-            auto pluginInstance =
-                loadPluginInstance(juce::File(config.pluginPath), sampleRate, blockSize, errorMessage);
-            if (!pluginInstance) {
-                std::cerr << "[runMeasurementGrid] Failed to load plugin instance " << i << ": " << errorMessage
-                          << std::endl;
-                return; // Can't continue without all instances
-            }
-            auto paramMap = buildParameterMap(*pluginInstance, false);
-            pluginInstances.push_back(std::move(pluginInstance));
-            paramMaps.push_back(paramMap);
-            std::cerr << "[runMeasurementGrid] Plugin instance " << (i + 1) << " ready" << std::endl;
-        }
-        std::cerr << "[runMeasurementGrid] All plugin instances loaded, starting worker threads..." << std::endl;
-
-        runMeasurementGridWithLoadedInstances(pluginInstances, paramMaps, sampleRate, blockSize, totalSamples,
-                                              runs, analyzers, config, outDir, progressCallback);
-
-        // Release plugin instances
-        for (auto& pluginInstance : pluginInstances) {
-            pluginInstance->releaseResources();
-        }
+        processRun(run, plugin, paramMap, paramNames, config, sampleRate, blockSize, totalSamples, analyzers);
     }
-
-    // Note: finish() is called by the caller, not here
 }

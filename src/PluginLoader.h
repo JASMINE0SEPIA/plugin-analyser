@@ -13,3 +13,6 @@ std::map<juce::String, juce::AudioProcessorParameter*> buildParameterMap(juce::A
 void setParameterValue(juce::AudioPluginInstance& plugin,
                        const std::map<juce::String, juce::AudioProcessorParameter*>& paramMap,
                        const juce::String& paramName, float normalizedValue);
+
+/// Reset all plugin parameters to their default values (prevents cross-config contamination)
+void resetAllParametersToDefault(juce::AudioPluginInstance& plugin);
