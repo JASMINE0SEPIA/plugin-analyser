@@ -4,6 +4,11 @@ project(plugin-analyser VERSION 1.0.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# MSVC needs /EHsc for C++ exceptions (required by JUCE)
+if(MSVC)
+    add_compile_options(/EHsc)
+endif()
+
 # JUCE setup
 # Note: You'll need to set JUCE_DIR or use FetchContent
 # For now, we'll assume JUCE is available via find_package or FetchContent
@@ -65,6 +70,12 @@ set(SOURCES
     src/LinearResponseAnalyzer.h
     src/ThdAnalyzer.cpp
     src/ThdAnalyzer.h
+    src/PhaseAnalyzer.cpp
+    src/PhaseAnalyzer.h
+    src/EnvelopeFollowerAnalyzer.cpp
+    src/EnvelopeFollowerAnalyzer.h
+    src/TransientAnalyzer.cpp
+    src/TransientAnalyzer.h
     src/MeasurementEngine.cpp
     src/MeasurementEngine.h
 )
@@ -125,6 +136,9 @@ add_executable(plugin_measure_grid_cli src/main_cli.cpp
     src/TransferCurveAnalyzer.cpp src/TransferCurveAnalyzer.h
     src/LinearResponseAnalyzer.cpp src/LinearResponseAnalyzer.h
     src/ThdAnalyzer.cpp src/ThdAnalyzer.h
+    src/PhaseAnalyzer.cpp src/PhaseAnalyzer.h
+    src/EnvelopeFollowerAnalyzer.cpp src/EnvelopeFollowerAnalyzer.h
+    src/TransientAnalyzer.cpp src/TransientAnalyzer.h
     src/MeasurementEngine.cpp src/MeasurementEngine.h
 )
 
