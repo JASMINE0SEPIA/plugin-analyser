@@ -1,11 +1,14 @@
 #include "MeasurementEngine.h"
 #include "BucketSpec.h"
+#include "EnvelopeFollowerAnalyzer.h"
 #include "LinearResponseAnalyzer.h"
+#include "PhaseAnalyzer.h"
 #include "PluginLoader.h"
 #include "RawCsvAnalyzer.h"
 #include "RmsPeakAnalyzer.h"
 #include "ThdAnalyzer.h"
 #include "TransferCurveAnalyzer.h"
+#include "TransientAnalyzer.h"
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -14,6 +17,15 @@
 #include <mutex>
 #include <queue>
 #include <thread>
+
+std::vector<juce::String> getAllParamNames(const Config& config) {
+    std::vector<juce::String> paramNames;
+    for (const auto& bucket : config.parameterBuckets)
+        paramNames.push_back(bucket.paramName);
+    for (const auto& [name, value] : config.fixedParameterValues)
+        paramNames.push_back(name);
+    return paramNames;
+}
 
 std::vector<RunConfig> buildRunGrid(const Config& config, const std::vector<juce::String>& paramNames) {
     std::cerr << "[buildRunGrid] Starting with " << paramNames.size() << " parameters, "
@@ -48,7 +60,11 @@ std::vector<RunConfig> buildRunGrid(const Config& config, const std::vector<juce
     std::function<void(int, std::map<juce::String, float>)> generateCombinations;
     generateCombinations = [&](int paramIndex, std::map<juce::String, float> currentParams) {
         if (paramIndex >= (int)paramValueLists.size()) {
-            // All parameters set, now combine with input gain buckets
+            // All bucketed parameters set — now add fixed parameters
+            for (const auto& [fixedName, fixedValue] : config.fixedParameterValues)
+                currentParams[fixedName] = fixedValue;
+
+            // Combine with input gain buckets
             for (float inputGainDb : config.inputGainBucketsDb) {
                 RunConfig run;
                 run.runId = runId++;
@@ -100,6 +116,30 @@ std::vector<std::unique_ptr<Analyzer>> createAnalyzers(const Config& config, con
             } else {
                 std::cerr << "Warning: Thd analyzer requires sine signal type" << std::endl;
             }
+        } else if (analyzerName.equalsIgnoreCase("Phase")) {
+            if (config.signalType.equalsIgnoreCase("noise") || config.signalType.equalsIgnoreCase("sweep")) {
+                analyzers.push_back(
+                    createPhaseAnalyzer(outDir, config.phaseFftSize, paramNames, config.signalType));
+            } else {
+                std::cerr << "Warning: Phase analyzer requires noise or sweep signal type" << std::endl;
+            }
+        } else if (analyzerName.equalsIgnoreCase("EnvelopeFollower")) {
+            if (config.signalType.equalsIgnoreCase("tone_burst")) {
+                analyzers.push_back(createEnvelopeFollowerAnalyzer(outDir, config.envelopeHopMs,
+                                                                   config.toneBurstFrequency, paramNames,
+                                                                   config.signalType));
+            } else {
+                std::cerr << "Warning: EnvelopeFollower analyzer requires tone_burst signal type" << std::endl;
+            }
+        } else if (analyzerName.equalsIgnoreCase("Transient")) {
+            if (config.signalType.equalsIgnoreCase("tone_burst")) {
+                analyzers.push_back(createTransientAnalyzer(outDir, config.transientAttackThresholdPct,
+                                                            config.transientReleaseThresholdPct,
+                                                            config.toneBurstFrequency, paramNames,
+                                                            config.signalType));
+            } else {
+                std::cerr << "Warning: Transient analyzer requires tone_burst signal type" << std::endl;
+            }
         } else {
             std::cerr << "Warning: Unknown analyzer: " << analyzerName << std::endl;
         }
@@ -114,7 +154,7 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
                        const std::vector<juce::String>& paramNames, const Config& config, double sampleRate,
                        int blockSize, int64_t totalSamples, std::vector<std::unique_ptr<Analyzer>>& analyzers,
                        std::mutex& analyzerMutex) {
-    // Set plugin parameters
+    // Set plugin parameters (both bucketed and fixed)
     for (const auto& [paramName, value] : run.paramValues) {
         setParameterValue(plugin, paramMap, paramName, value);
     }
@@ -126,6 +166,8 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
     std::unique_ptr<SineGenerator> sineGen;
     std::unique_ptr<NoiseGenerator> noiseGen;
     std::unique_ptr<SweepGenerator> sweepGen;
+    std::unique_ptr<ToneBurstGenerator> toneBurstGen;
+    std::unique_ptr<ImpulseGenerator> impulseGen;
 
     if (config.signalType.equalsIgnoreCase("sine")) {
         sineGen = std::make_unique<SineGenerator>();
@@ -143,6 +185,21 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
         sweepGen->duration = config.seconds;
         sweepGen->amplitude = inputGainLinear;
         sweepGen->reset();
+    } else if (config.signalType.equalsIgnoreCase("tone_burst")) {
+        toneBurstGen = std::make_unique<ToneBurstGenerator>();
+        toneBurstGen->sampleRate = sampleRate;
+        toneBurstGen->frequency = config.toneBurstFrequency;
+        toneBurstGen->burstDuration = config.toneBurstDuration;
+        toneBurstGen->silenceDuration = config.toneBurstSilenceDuration;
+        toneBurstGen->attackRamp = config.toneBurstAttackRamp;
+        toneBurstGen->preSilence = config.toneBurstPreSilence;
+        toneBurstGen->amplitude = inputGainLinear;
+        toneBurstGen->silenceAmplitude = config.toneBurstSilenceAmplitude * inputGainLinear;
+        toneBurstGen->reset();
+    } else if (config.signalType.equalsIgnoreCase("impulse")) {
+        impulseGen = std::make_unique<ImpulseGenerator>();
+        impulseGen->amplitude = inputGainLinear;
+        impulseGen->reset();
     }
 
     // Process samples
@@ -165,6 +222,10 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
             noiseGen->fillBlock(inputBuffer, numThisBlock);
         } else if (sweepGen) {
             sweepGen->fillBlock(inputBuffer, numThisBlock);
+        } else if (toneBurstGen) {
+            toneBurstGen->fillBlock(inputBuffer, numThisBlock);
+        } else if (impulseGen) {
+            impulseGen->fillBlock(inputBuffer, numThisBlock);
         }
 
         // Copy input to output buffer (processBlock works in-place)
@@ -207,6 +268,79 @@ static void processRun(const RunConfig& run, juce::AudioPluginInstance& plugin,
     }
 }
 
+void runMeasurementGridWithLoadedInstances(
+    std::vector<std::unique_ptr<juce::AudioPluginInstance>>& pluginInstances,
+    std::vector<std::map<juce::String, juce::AudioProcessorParameter*>>& paramMaps,
+    double sampleRate, int blockSize, int64_t totalSamples, const std::vector<RunConfig>& runs,
+    const std::vector<std::unique_ptr<Analyzer>>& analyzers, const Config& config, const juce::File& outDir,
+    std::function<void(int)> progressCallback) {
+    int numThreads = (int)pluginInstances.size();
+    std::cerr << "[runMeasurementGridWithLoadedInstances] Starting with " << runs.size() << " runs, "
+              << totalSamples << " samples per run, " << numThreads << " thread(s)" << std::endl;
+
+    std::queue<RunConfig> runQueue;
+    std::mutex queueMutex;
+    std::mutex analyzerMutex;
+    std::atomic<int> completedRuns{0};
+    std::atomic<int> currentRunIndex{0};
+
+    // Populate queue
+    for (const auto& run : runs) {
+        runQueue.push(run);
+    }
+
+    // Build param names for this config
+    std::vector<juce::String> paramNames = getAllParamNames(config);
+
+    // Worker function
+    auto worker = [&](int threadId) {
+        auto& threadPlugin = pluginInstances[threadId];
+        auto& paramMap = paramMaps[threadId];
+
+        while (true) {
+            RunConfig run;
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                if (runQueue.empty()) {
+                    break;
+                }
+                run = runQueue.front();
+                runQueue.pop();
+            }
+
+            int runIdx = currentRunIndex.fetch_add(1);
+            if (progressCallback) {
+                progressCallback(run.runId);
+            }
+            if (runIdx % 10 == 0 || runIdx == 0) {
+                std::cerr << "[runMeasurementGridWithLoadedInstances] Thread " << threadId
+                          << " processing run " << run.runId << " / " << runs.size() << std::endl;
+            }
+
+            processRun(run, *threadPlugin, paramMap, paramNames, config, sampleRate, blockSize, totalSamples,
+                       const_cast<std::vector<std::unique_ptr<Analyzer>>&>(analyzers), analyzerMutex);
+
+            completedRuns.fetch_add(1);
+        }
+    };
+
+    // Launch threads
+    std::vector<std::thread> threads;
+    for (int i = 0; i < numThreads; ++i) {
+        threads.emplace_back(worker, i);
+    }
+
+    // Wait for all threads
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    std::cerr << "[runMeasurementGridWithLoadedInstances] All threads completed. Processed "
+              << completedRuns.load() << " runs" << std::endl;
+
+    // Note: finish() is called by the caller, not here
+}
+
 void runMeasurementGrid(juce::AudioPluginInstance& plugin, double sampleRate, int blockSize, int64_t totalSamples,
                         const std::vector<RunConfig>& runs, const std::vector<std::unique_ptr<Analyzer>>& analyzers,
                         const Config& config, const juce::File& outDir, std::function<void(int)> progressCallback,
@@ -215,10 +349,7 @@ void runMeasurementGrid(juce::AudioPluginInstance& plugin, double sampleRate, in
               << " samples per run, " << numThreads << " thread(s)" << std::endl;
 
     // Build parameter name list in order
-    std::vector<juce::String> paramNames;
-    for (const auto& bucket : config.parameterBuckets) {
-        paramNames.push_back(bucket.paramName);
-    }
+    std::vector<juce::String> paramNames = getAllParamNames(config);
 
     // If single-threaded, use original sequential code
     if (numThreads <= 1) {
@@ -233,97 +364,36 @@ void runMeasurementGrid(juce::AudioPluginInstance& plugin, double sampleRate, in
         }
     } else {
         // Multi-threaded execution
-        std::queue<RunConfig> runQueue;
-        std::mutex queueMutex;
-        std::mutex analyzerMutex;
-        std::atomic<int> completedRuns{0};
-        std::atomic<int> currentRunIndex{0};
-
-        // Populate queue
-        for (const auto& run : runs) {
-            runQueue.push(run);
-        }
-
-        // Pre-load all plugin instances sequentially to avoid thread-safety issues
         std::cerr << "[runMeasurementGrid] Pre-loading " << numThreads << " plugin instances..." << std::endl;
         std::vector<std::unique_ptr<juce::AudioPluginInstance>> pluginInstances;
         std::vector<std::map<juce::String, juce::AudioProcessorParameter*>> paramMaps;
 
         for (int i = 0; i < numThreads; ++i) {
-            std::cerr << "[runMeasurementGrid] Loading plugin instance " << (i + 1) << " / " << numThreads << "..."
-                      << std::endl;
+            std::cerr << "[runMeasurementGrid] Loading plugin instance " << (i + 1) << " / " << numThreads
+                      << "..." << std::endl;
             juce::String errorMessage;
-            auto plugin = loadPluginInstance(juce::File(config.pluginPath), sampleRate, blockSize, errorMessage);
-            if (!plugin) {
+            auto pluginInstance =
+                loadPluginInstance(juce::File(config.pluginPath), sampleRate, blockSize, errorMessage);
+            if (!pluginInstance) {
                 std::cerr << "[runMeasurementGrid] Failed to load plugin instance " << i << ": " << errorMessage
                           << std::endl;
                 return; // Can't continue without all instances
             }
-            auto paramMap = buildParameterMap(*plugin, false);
-            pluginInstances.push_back(std::move(plugin));
+            auto paramMap = buildParameterMap(*pluginInstance, false);
+            pluginInstances.push_back(std::move(pluginInstance));
             paramMaps.push_back(paramMap);
             std::cerr << "[runMeasurementGrid] Plugin instance " << (i + 1) << " ready" << std::endl;
         }
         std::cerr << "[runMeasurementGrid] All plugin instances loaded, starting worker threads..." << std::endl;
 
-        // Worker function
-        auto worker = [&](int threadId) {
-            auto& threadPlugin = pluginInstances[threadId];
-            auto& paramMap = paramMaps[threadId];
-            std::cerr << "[runMeasurementGrid] Thread " << threadId << " ready, starting to process runs..."
-                      << std::endl;
-
-            while (true) {
-                RunConfig run;
-                {
-                    std::lock_guard<std::mutex> lock(queueMutex);
-                    if (runQueue.empty()) {
-                        break;
-                    }
-                    run = runQueue.front();
-                    runQueue.pop();
-                }
-
-                int runIdx = currentRunIndex.fetch_add(1);
-                if (progressCallback) {
-                    progressCallback(run.runId);
-                }
-                if (runIdx % 10 == 0 || runIdx == 0) {
-                    std::cerr << "[runMeasurementGrid] Thread processing run " << run.runId << " / " << runs.size()
-                              << std::endl;
-                }
-
-                processRun(run, *threadPlugin, paramMap, paramNames, config, sampleRate, blockSize, totalSamples,
-                           const_cast<std::vector<std::unique_ptr<Analyzer>>&>(analyzers), analyzerMutex);
-
-                completedRuns.fetch_add(1);
-            }
-        };
-
-        // Launch threads
-        std::cerr << "[runMeasurementGrid] Launching " << numThreads << " worker threads..." << std::endl;
-        std::vector<std::thread> threads;
-        for (int i = 0; i < numThreads; ++i) {
-            threads.emplace_back(worker, i);
-        }
-        std::cerr << "[runMeasurementGrid] All threads launched" << std::endl;
-
-        // Wait for all threads
-        for (auto& thread : threads) {
-            thread.join();
-        }
+        runMeasurementGridWithLoadedInstances(pluginInstances, paramMaps, sampleRate, blockSize, totalSamples,
+                                              runs, analyzers, config, outDir, progressCallback);
 
         // Release plugin instances
-        for (auto& plugin : pluginInstances) {
-            plugin->releaseResources();
+        for (auto& pluginInstance : pluginInstances) {
+            pluginInstance->releaseResources();
         }
-
-        std::cerr << "[runMeasurementGrid] All threads completed. Processed " << completedRuns.load() << " runs"
-                  << std::endl;
     }
 
-    // Finish all analyzers
-    for (auto& analyzer : analyzers) {
-        analyzer->finish(outDir);
-    }
+    // Note: finish() is called by the caller, not here
 }

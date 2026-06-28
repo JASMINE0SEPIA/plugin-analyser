@@ -7,7 +7,32 @@
   "sineFrequency": 1000.0,
   "sweepStartHz": 20.0,
   "sweepEndHz": 20000.0,
+  "toneBurst": {
+    "toneFrequency": 1000.0,
+    "burstDuration": 0.5,
+    "silenceDuration": 0.5,
+    "attackRamp": 0.001,
+    "preSilence": 0.05,
+    "silenceAmplitude": 0.01
+  },
+  "impulse": {
+    "type": "dirac",
+    "amplitude": 1.0
+  },
+  "envelope": {
+    "hopMs": 0.2
+  },
+  "phase": {
+    "fftSize": 4096
+  },
+  "transient": {
+    "attackThresholdPct": 63.0,
+    "releaseThresholdPct": 63.0
+  },
   "inputGainBucketsDb": [-24.0, -18.0, -12.0],
+  "fixedParameterValues": {
+    "Clean XOV": 0.0
+  },
   "parameterBuckets": [
     {
       "paramName": "Gain",
@@ -32,6 +57,9 @@
     "RmsPeak",
     "TransferCurve",
     "LinearResponse",
-    "Thd"
+    "Thd",
+    "Phase",
+    "EnvelopeFollower",
+    "Transient"
   ]
 }
